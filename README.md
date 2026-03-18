@@ -34,6 +34,7 @@ Both demos run 3 scenarios:
 - **Workflow approach details**: `[workflow_approach/README.md](workflow_approach/README.md)`
 - **Event-driven approach details**: `[event_driven_approach/README.md](event_driven_approach/README.md)`
 - **Comparison + lessons learned**: `[comparison.md](comparison.md)`
+- **Evolution stages (robust + scalable)**: `[docs/plans/2026-03-18-evolution-stages-workflow-vs-event-driven.md](docs/plans/2026-03-18-evolution-stages-workflow-vs-event-driven.md)`
 
 ## Repo map
 

@@ -23,6 +23,7 @@ python -m workflow_approach.main
 ```
 
 You will see 3 scenarios:
+
 - Approved
 - Rejected (credit score too low)
 - Failure injection (random service failures)
@@ -80,4 +81,3 @@ sequenceDiagram
 
 - `workflow_approach/orchestrator.py`: `LoanWorkflowOrchestrator.process()` is the “single source of truth” for the flow.
 - `workflow_approach/services.py`: step implementations + failure injection.
-
