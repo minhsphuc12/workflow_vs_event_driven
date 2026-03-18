@@ -10,6 +10,7 @@ from event_driven_approach.events import (
     ApplicationSubmitted,
     CreditChecked,
     CreditFailed,
+    IdentityVerificationRequested,
     IdentityFailed,
     IdentityVerified,
     LoanApproved,
@@ -50,6 +51,37 @@ class ApplicationStore:
         return self._apps[application_id]
 
 
+class ApplicationRouter:
+    """
+    Routes the pipeline based on event metadata.
+
+    For the demo:
+    - New customer: trigger identity verification.
+    - Existing customer: skip identity step and continue to credit.
+    """
+
+    def __init__(self, *, bus: EventBus, store: ApplicationStore, log: Callable[[str], None]):
+        self._bus = bus
+        self._store = store
+        self._log = log
+
+        bus.subscribe(ApplicationSubmitted, self.on_submitted)
+
+    def on_submitted(self, evt: ApplicationSubmitted) -> None:
+        app = self._store.get(evt.application_id)
+        self._log("[EventDriven] ApplicationRouter <= ApplicationSubmitted")
+
+        if evt.is_new_customer:
+            app.record("router:identity_required:new_customer")
+            self._bus.publish(IdentityVerificationRequested(evt.application_id))
+            return
+
+        app.status = ApplicationStatus.IDENTITY_VERIFIED
+        app.metadata["identity_verified"] = True
+        app.record("router:identity_skipped:existing_customer")
+        self._bus.publish(IdentityVerified(evt.application_id))
+
+
 class IdentityHandler:
     def __init__(self, *, bus: EventBus, store: ApplicationStore, config: HandlerConfig, log: Callable[[str], None]):
         self._bus = bus
@@ -58,11 +90,11 @@ class IdentityHandler:
         self._rng = config.rng()
         self._log = log
 
-        bus.subscribe(ApplicationSubmitted, self.on_submitted)
+        bus.subscribe(IdentityVerificationRequested, self.on_identity_verification_requested)
 
-    def on_submitted(self, evt: ApplicationSubmitted) -> None:
+    def on_identity_verification_requested(self, evt: IdentityVerificationRequested) -> None:
         app = self._store.get(evt.application_id)
-        self._log("[EventDriven] IdentityHandler <= ApplicationSubmitted")
+        self._log("[EventDriven] IdentityHandler <= IdentityVerificationRequested")
         time.sleep(self._rng.uniform(self._cfg.min_delay_s, self._cfg.max_delay_s))
 
         if self._rng.random() < self._cfg.failure_rate:

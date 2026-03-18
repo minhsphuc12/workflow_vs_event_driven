@@ -5,6 +5,7 @@ import uuid
 from event_driven_approach.event_bus import EventBus
 from event_driven_approach.events import ApplicationSubmitted
 from event_driven_approach.handlers import (
+    ApplicationRouter,
     ApplicationStore,
     CreditHandler,
     DecisionHandler,
@@ -56,6 +57,7 @@ def build_system(*, failure_rate: float, seed: int) -> tuple[EventBus, Applicati
     bus = EventBus()
     store = ApplicationStore()
 
+    ApplicationRouter(bus=bus, store=store, log=log)
     IdentityHandler(bus=bus, store=store, config=HandlerConfig(failure_rate=failure_rate, rng_seed=seed), log=log)
     CreditHandler(bus=bus, store=store, config=HandlerConfig(failure_rate=failure_rate, rng_seed=seed + 1), log=log)
     RiskHandler(bus=bus, store=store, config=HandlerConfig(failure_rate=failure_rate, rng_seed=seed + 2), log=log)
@@ -73,6 +75,7 @@ def scenario_approved() -> LoanApplication:
         amount=10_000,
         income=80_000,
         credit_score=740,
+        metadata={"is_new_customer": True},
     )
 
 
@@ -83,6 +86,7 @@ def scenario_rejected_credit() -> LoanApplication:
         amount=5_000,
         income=60_000,
         credit_score=540,
+        metadata={"is_new_customer": False},
     )
 
 
@@ -93,6 +97,7 @@ def scenario_failure() -> LoanApplication:
         amount=50_000,
         income=50_000,
         credit_score=700,
+        metadata={"is_new_customer": True},
     )
 
 
@@ -101,7 +106,8 @@ def run_scenario(app: LoanApplication, *, failure_rate: float, seed: int) -> Non
     store.put(app)
     app.record("event_driven:start")
     log(f"[EventDriven] publish ApplicationSubmitted application_id={app.application_id}")
-    bus.publish(ApplicationSubmitted(app.application_id))
+    is_new_customer = bool(app.metadata.get("is_new_customer", True))
+    bus.publish(ApplicationSubmitted(app.application_id, is_new_customer=is_new_customer))
     print_summary(app, bus)
 
 

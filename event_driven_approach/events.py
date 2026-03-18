@@ -6,6 +6,12 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class ApplicationSubmitted:
     application_id: str
+    is_new_customer: bool
+
+
+@dataclass(slots=True)
+class IdentityVerificationRequested:
+    application_id: str
 
 
 @dataclass(slots=True)
