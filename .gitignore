@@ -10,4 +10,6 @@ env/
 dist/
 build/
 *.egg-info/
-
+docs/blog
+.worktrees/
+tmp/
