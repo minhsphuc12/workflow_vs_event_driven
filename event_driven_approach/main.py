@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from event_driven_approach.event_bus import EventBus
 from event_driven_approach.events import ApplicationSubmitted
@@ -17,6 +18,7 @@ from event_driven_approach.handlers import (
     RiskHandler,
 )
 from event_driven_approach.models import LoanApplication
+from event_driven_approach.event_tracer import EventTracer
 
 
 class Ansi:
@@ -103,12 +105,19 @@ def scenario_failure() -> LoanApplication:
 
 def run_scenario(app: LoanApplication, *, failure_rate: float, seed: int) -> None:
     bus, store = build_system(failure_rate=failure_rate, seed=seed)
+    out_dir = Path("tmp")
+    tracer = EventTracer(output_dir=out_dir)
+    bus.set_tracer(tracer, trace_id=uuid.uuid4().hex)
+
     store.put(app)
     app.record("event_driven:start")
     log(f"[EventDriven] publish ApplicationSubmitted application_id={app.application_id}")
     is_new_customer = bool(app.metadata.get("is_new_customer", True))
     bus.publish(ApplicationSubmitted(app.application_id, is_new_customer=is_new_customer))
     print_summary(app, bus)
+
+    tracer.flush_jsonl(application_id=app.application_id)
+    tracer.flush_markdown(application_id=app.application_id)
 
 
 def main() -> None:
