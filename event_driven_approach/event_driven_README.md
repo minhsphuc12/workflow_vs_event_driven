@@ -29,6 +29,8 @@ You will see 3 scenarios:
 
 The demo also prints an **event trace** so you can see which events were published for each application.
 
+It also writes `tmp/event_trace_<application_id>.jsonl` (structured log) and `tmp/event_trace_<application_id>.md` with a **Mermaid sequence diagram** using three actors: **Publisher** (first event of the application), **Bus**, and **Handler**; arrow labels are **event type names** only.
+
 ## Event flow diagram
 
 ```mermaid

@@ -3,6 +3,7 @@
 **Goal:** Increase visibility of the end-to-end event-driven flow by producing (1) structured logs and (2) a Mermaid visualization that includes both Events and Handlers, exported to `tmp/` per `application_id`.
 
 **Non-goals:**
+
 - Distributed tracing across processes/services (this demo is synchronous, in-memory).
 - Persistent storage, UI dashboard, or live web visualization.
 - Backwards-compatible tracing format guarantees (we can iterate).
@@ -28,6 +29,7 @@
 ### Key idea: instrument the bus, not individual handlers
 
 We extend `EventBus` to:
+
 - wrap subscribed handlers (on `subscribe`) to capture:
   - handler name
   - `handle_start` / `handle_end`
@@ -42,6 +44,7 @@ This yields a complete, correlated execution trace without modifying each handle
 ### Trace correlation model
 
 We introduce a lightweight context stack inside `EventBus`:
+
 - When a handler starts, push an “active handler context”:
   - `trace_id` (per scenario/run)
   - `application_id` (derived from incoming event payload if present)
@@ -78,6 +81,7 @@ Each record is a JSON object written as one line (`jsonl`):
 ### Payload summary rules
 
 For any payload (event object), extract:
+
 - If attribute exists: `application_id`
 - If attribute exists: `reason`, `credit_score`, `risk_score`, `message`
 - Additionally: include a bounded representation of other primitive fields if needed (string/int/float/bool), but cap:
@@ -87,6 +91,7 @@ For any payload (event object), extract:
 ### Output writer
 
 We add an `EventTracer` component (small module) responsible for:
+
 - buffering trace records in memory (for rendering)
 - appending to `tmp/event_trace_<application_id>.jsonl`
 - producing `tmp/event_trace_<application_id>.md` that includes:
@@ -99,10 +104,12 @@ We keep this component separated from `EventBus` so the bus stays generic.
 ### Mermaid graph generation
 
 We render nodes with stable ids:
+
 - Event node id: `E_<EventName>`
 - Handler node id: `H_<HandlerName>` (sanitize non-alphanumerics to `_`)
 
 Edges:
+
 - On `handle_start`: create `E_incoming -> H_handler`
 - On `publish` within handler: create `H_handler -> E_published`
 
@@ -130,6 +137,7 @@ We generate the graph per `application_id` and per run (trace_id), so multi-scen
 ## Testing strategy (TDD)
 
 Add tests to validate:
+
 - A handler call produces `handle_start` then `handle_end` with duration.
 - `publish` inside a handler is linked to that handler (parent span id present).
 - Mermaid output contains expected nodes/edges for a simple 2-step pipeline.

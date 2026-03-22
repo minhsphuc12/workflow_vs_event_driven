@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 import time
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 
 
 def _cap_string(value: str, *, max_len: int) -> str:
@@ -96,43 +96,48 @@ class EventTracer:
                 f.write(json.dumps(asdict(r), ensure_ascii=False) + "\n")
         return path
 
-    def _node_id_event(self, event_name: str) -> str:
-        return f"E_{event_name}"
-
-    def _node_id_handler(self, handler_name: str) -> str:
-        safe = "".join(ch if ch.isalnum() else "_" for ch in handler_name)
-        return f"H_{safe}"
+    def _participant_id(self, name: str) -> str:
+        safe = "".join(ch if ch.isalnum() else "_" for ch in name)
+        if not safe or safe[0].isdigit():
+            safe = f"P_{safe}"
+        return safe
 
     def render_markdown(self, *, application_id: str) -> str:
-        records = list(self._iter_for_application(application_id))
+        records = sorted(list(self._iter_for_application(application_id)), key=lambda r: (r.ts_ms, r.kind))
 
-        edges: Set[Tuple[str, str]] = set()
-        labels: Dict[str, str] = {}
         handler_durations: Dict[str, float] = {}
-
+        handler_names: List[str] = []
         for r in records:
-            if r.kind == "handle_start" and r.event_name and r.handler_name:
-                e_id = self._node_id_event(r.event_name)
-                h_id = self._node_id_handler(r.handler_name)
-                labels[e_id] = r.event_name
-                labels[h_id] = r.handler_name
-                edges.add((e_id, h_id))
-
-            if r.kind == "publish" and r.event_name and r.handler_name:
-                h_id = self._node_id_handler(r.handler_name)
-                e_id = self._node_id_event(r.event_name)
-                labels[h_id] = r.handler_name
-                labels[e_id] = r.event_name
-                edges.add((h_id, e_id))
-
+            if r.handler_name and r.handler_name not in handler_names:
+                handler_names.append(r.handler_name)
             if r.kind == "handle_end" and r.handler_name and r.duration_ms is not None:
                 handler_durations[r.handler_name] = handler_durations.get(r.handler_name, 0.0) + float(r.duration_ms)
 
-        mermaid_lines: List[str] = ["flowchart TD"]
-        for node_id, label in sorted(labels.items()):
-            mermaid_lines.append(f'  {node_id}["{label}"]')
-        for a, b in sorted(edges):
-            mermaid_lines.append(f"  {a} --> {b}")
+        # Actors: Publisher (first event only), Bus, and concrete handlers.
+        # Arrow labels are event type names only (no payload).
+        mermaid_lines: List[str] = [
+            "sequenceDiagram",
+            "participant Publisher",
+            "participant Bus",
+        ]
+        for handler_name in handler_names:
+            mermaid_lines.append(f'participant {self._participant_id(handler_name)} as "{handler_name}"')
+
+        for r in records:
+            if r.kind == "publish" and r.event_name:
+                if r.handler_name is None:
+                    mermaid_lines.append(f"Publisher ->> Bus: {r.event_name}")
+                else:
+                    mermaid_lines.append(f"{self._participant_id(r.handler_name)} ->> Bus: {r.event_name}")
+
+            if r.kind == "handle_start" and r.event_name and r.handler_name:
+                mermaid_lines.append(f"Bus ->> {self._participant_id(r.handler_name)}: {r.event_name}")
+
+            if r.kind == "handle_error" and r.handler_name and r.error:
+                msg = r.error.replace("\n", " ")
+                if len(msg) > 160:
+                    msg = msg[:159] + "…"
+                mermaid_lines.append(f"Note over {self._participant_id(r.handler_name)}: error={msg}")
 
         mermaid = "\n".join(mermaid_lines)
 

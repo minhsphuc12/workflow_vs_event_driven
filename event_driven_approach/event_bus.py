@@ -36,6 +36,17 @@ class EventBus:
         self._active_handler_spans: List[tuple[str, str]] = []
 
     def subscribe(self, event_type: Type[TEvent], handler: Callable[[TEvent], None]) -> None:
+        """
+        Subscribe a handler function to a specific event type.
+
+        When an event of the given type is published, the provided handler will be
+        called synchronously with the event instance as an argument. If tracing is
+        enabled (via set_tracer), the handler executions are traced for observability.
+
+        Args:
+            event_type: The type of event to listen for.
+            handler: A callable that takes a single event object of type event_type.
+        """
         def handler_name() -> str:
             if hasattr(handler, "__self__") and getattr(handler, "__self__", None) is not None:
                 return f"{handler.__self__.__class__.__name__}.{handler.__name__}"  # type: ignore[attr-defined]
